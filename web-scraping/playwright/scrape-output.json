@@ -1,0 +1,46 @@
+{
+  "query": "Volturno Pizza Napoletana 72 Shrewsbury St, Worcester, MA 01604",
+  "top": [
+    {
+      "word": "wikimedia",
+      "count": 36
+    },
+    {
+      "word": "cookies",
+      "count": 32
+    },
+    {
+      "word": "cookie",
+      "count": 28
+    },
+    {
+      "word": "sites",
+      "count": 20
+    },
+    {
+      "word": "information",
+      "count": 15
+    },
+    {
+      "word": "data",
+      "count": 15
+    },
+    {
+      "word": "preferences",
+      "count": 14
+    },
+    {
+      "word": "policy",
+      "count": 13
+    },
+    {
+      "word": "privacy",
+      "count": 13
+    },
+    {
+      "word": "user",
+      "count": 13
+    }
+  ],
+  "timestamp": "2026-02-19T20:06:33.094Z"
+}
