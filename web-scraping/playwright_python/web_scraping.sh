@@ -11,7 +11,7 @@
 
 #cd $SLURM_SUBMIT_DIR/../..
 
-#module load python/3.10.2/mqmlxcf
+module load python/3.10.2/mqmlxcf
 
 python -m venv env
 source env/bin/active
