@@ -5,14 +5,14 @@
 #SBATCH -J "gqp_webscraping"
 #SBATCH -o gqp_webscraping%j.out
 #SBATCH -e gqp_webscraping%j.err
-#SBATCH -p academic
+#SBATCH -p short
 #SBATCH -t 20:00:00
 #SBATCH --gres=gpu:H200:1
 
 module load python/3.10.2/mqmlxcf
 
 python -m venv env
-source env/bin/active
+source env/bin/activate
 
 pip install --upgrade pip
 pip install numpy
