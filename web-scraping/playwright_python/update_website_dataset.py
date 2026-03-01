@@ -50,21 +50,14 @@ def add_top_words_column(df: pd.DataFrame, url_column: str = 'Insured Website', 
     return df
 
 
-def _main_():
+if __name__ == "__main__":
     print("Starting Script")
-    df = import_csv()
+    df = pd.read_csv('NAICS_data_with_websites.csv')
+    
     # only process a subset for speed when testing
-    #df = df[:20]
+    df = df[:20]
 
     df = add_top_words_column(df)
     print(df[['Insured Website', 'words']].head())
     df.to_csv('website_dataset.csv', index=False)
     print('Done')
-
-def import_csv():
-    df = pd.read_csv('NAICS_data_with_websites.csv')
-    return df
-
-
-if __name__ == "__main__":
-    _main_()
