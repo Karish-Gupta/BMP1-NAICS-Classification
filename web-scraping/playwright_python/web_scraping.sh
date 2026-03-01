@@ -19,5 +19,7 @@ pip install numpy
 pip install pandas
 pip install playwright
 
+playwright install 
+
 python update_website_dataset.py
 
