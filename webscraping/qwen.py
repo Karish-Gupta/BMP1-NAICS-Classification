@@ -8,7 +8,7 @@ if "HF_TOKEN" in os.environ:
    login(token=os.environ["HF_TOKEN"])
 
 class QwenLLM:
-   def __init__(self, model_name="Qwen/Qwen3.5-9B"):
+   def __init__(self, model_name="Qwen/Qwen3-14B"):
       self.model, self.tokenizer = FastLanguageModel.from_pretrained(
          model_name = model_name,
          max_seq_length = 2048,
@@ -60,6 +60,13 @@ class QwenLLM:
 
       prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
       
-      response = self.generate(prompt)
+      raw_response = self.generate(prompt)
       
-      return response.replace("<|im_end|>", "").strip()
+      # Isolate the actual response from the thought process
+      if "</think>" in raw_response:
+         # We take everything after the first occurrence of </think>
+         actual_output = raw_response.split("</think>", 1)[1].strip()
+      else:
+         actual_output = raw_response.strip()
+      
+      return actual_output

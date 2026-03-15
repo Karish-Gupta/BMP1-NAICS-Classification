@@ -18,6 +18,7 @@ python -m venv env
 source env/bin/activate
 
 pip install --upgrade pip
+pip install unsloth
 pip install numpy
 pip install pandas
 pip install playwright
