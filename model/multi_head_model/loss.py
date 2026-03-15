@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 class HierarchicalLoss(nn.Module):
-    def __init__(self, alpha=0.5, beta=0.3, gamma=0.2):
+    def __init__(self, alpha=0.2, beta=0.3, gamma=0.5):
         super(HierarchicalLoss, self).__init__()
         self.criterion = nn.CrossEntropyLoss()
         
@@ -11,11 +11,11 @@ class HierarchicalLoss(nn.Module):
         self.gamma = gamma
 
     def forward(self, preds, targets):
-        sector_logits, subsector_logits, industry_logits = preds
-        sector_labels, subsector_labels, industry_labels = targets
+        # preds: dict from NAICSClassifier (sector, subsector, industry)
+        # targets: dict from NAICSDataset labels (sector, subsector, industry)
         
-        l1 = self.criterion(sector_logits, sector_labels)
-        l2 = self.criterion(subsector_logits, subsector_labels)
-        l3 = self.criterion(industry_logits, industry_labels)
+        l1 = self.criterion(preds['sector'], targets['sector'])
+        l2 = self.criterion(preds['subsector'], targets['subsector'])
+        l3 = self.criterion(preds['industry'], targets['industry'])
         
         return (self.alpha * l1) + (self.beta * l2) + (self.gamma * l3)
