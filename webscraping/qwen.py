@@ -8,10 +8,10 @@ if "HF_TOKEN" in os.environ:
    login(token=os.environ["HF_TOKEN"])
 
 class QwenLLM:
-   def __init__(self, model_name="Qwen/Qwen3-4B-Thinking-2507"):
+   def __init__(self, model_name="Qwen/Qwen3.5-9B"):
       self.model, self.tokenizer = FastLanguageModel.from_pretrained(
          model_name = model_name,
-         max_seq_length = 8192, # Increased for Qwen3-Thinking depth
+         max_seq_length = 2048,
          dtype = None,
          load_in_4bit = True,
       )
@@ -35,7 +35,6 @@ class QwenLLM:
          )
 
       generated_tokens = outputs[0][inputs.input_ids.shape[1]:]
-      # Use skip_special_tokens=False if you want to see the <think> tags for debugging
       generated_response = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)
 
       return generated_response
@@ -61,13 +60,6 @@ class QwenLLM:
 
       prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
       
-      raw_response = self.generate(prompt)
+      response = self.generate(prompt)
       
-      # Isolate the actual response from the thought process
-      if "</think>" in raw_response:
-         # We take everything after the first occurrence of </think>
-         actual_output = raw_response.split("</think>", 1)[1].strip()
-      else:
-         actual_output = raw_response.strip()
-      
-      return actual_output
+      return response.replace("<|im_end|>", "").strip()

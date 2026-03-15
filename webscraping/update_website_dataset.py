@@ -4,6 +4,13 @@ from webscraping.qwen import QwenLLM
 import pandas as pd
 import asyncio
 
+import logging
+import warnings
+
+# Suppress the specific transformers logging bug and deprecation warnings
+logging.getLogger("transformers").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 # CONFIG
 INPUT_FILE = 'data/NAICS_data_with_websites.csv'
 OUTPUT_FILE = 'website_summaries.csv'
@@ -14,8 +21,8 @@ qwen = QwenLLM()
 
 def summarize_text(text):
     """Sync wrapper for LLM call to handle local processing safely."""
-    if not text or len(text) < 50:
-        return "No sufficient content found to summarize."
+    if not isinstance(text, str) or len(text.strip()) < 50:
+        return "Insufficient content for summary."
     
     try:
         # Assuming QwenLLM has a generate or invoke method
