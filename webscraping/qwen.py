@@ -68,5 +68,7 @@ class QwenLLM:
          actual_output = raw_response.split("</think>", 1)[1].strip()
       else:
          actual_output = raw_response.strip()
+
+      actual_output = actual_output.replace("<|im_end|>", "").strip() # Remove any generation prompt artifacts
       
       return actual_output
