@@ -46,6 +46,7 @@ try:
     )
     
     # Save the final model weights
+    os.makedirs("outputs", exist_ok=True)
     torch.save(model.state_dict(), "outputs/naics_multi_head.pth")
     print("Training complete. Model saved to outputs/")
 
