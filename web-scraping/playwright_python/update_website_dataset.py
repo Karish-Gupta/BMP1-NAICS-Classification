@@ -37,7 +37,12 @@ def top_words_from_url(url: str, top_n: int = 10) -> list[str]:
 
 def add_top_words_column(df: pd.DataFrame, url_column: str = 'Insured Website', words_column: str = 'words') -> pd.DataFrame:
     
-    df[words_column] = np.nan
+    # ensure words column is string/object dtype to accept comma-separated terms
+    if words_column not in df.columns:
+        df[words_column] = ''
+    else:
+        df[words_column] = df[words_column].astype('string')
+
     for idx, row in df.iterrows():
         url = row.get(url_column)
         if pd.isna(url) or not str(url).strip():
@@ -50,21 +55,25 @@ def add_top_words_column(df: pd.DataFrame, url_column: str = 'Insured Website', 
     return df
 
 
-def _main_():
+if __name__ == "__main__":
     print("Starting Script")
-    df = import_csv()
+    df = pd.read_csv('data/NAICS_data_with_websites.csv')
+    
     # only process a subset for speed when testing
-    #df = df[:20]
+    df = df[:20]
 
     df = add_top_words_column(df)
     print(df[['Insured Website', 'words']].head())
-    df.to_csv('website_dataset.csv', index=False)
+    df.to_csv('../data/website_dataset.csv', index=False)
     print('Done')
+<<<<<<< HEAD
 
 def import_csv():
-    df = pd.read_csv('NAICS_data_with_websites.csv')
+    df = pd.read_csv('../data/NAICS_data_with_websites.csv')
     return df
 
 
 if __name__ == "__main__":
     _main_()
+=======
+>>>>>>> ba0ed04b9168c4e1fff8a7b4805ea10ed3389f49
