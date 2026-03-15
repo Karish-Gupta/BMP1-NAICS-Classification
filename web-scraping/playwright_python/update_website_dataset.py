@@ -69,11 +69,9 @@ if __name__ == "__main__":
 <<<<<<< HEAD
 
 def import_csv():
-    df = pd.read_csv('../data/NAICS_data_with_websites.csv')
+    df = pd.read_csv('NAICS_data_with_websites.csv')
     return df
 
 
 if __name__ == "__main__":
     _main_()
-=======
->>>>>>> ba0ed04b9168c4e1fff8a7b4805ea10ed3389f49
