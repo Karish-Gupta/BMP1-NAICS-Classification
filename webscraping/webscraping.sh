@@ -24,5 +24,5 @@ pip install playwright
 
 playwright install 
 
-python update_website_dataset.py
+python -m webscraping.update_website_dataset
 
