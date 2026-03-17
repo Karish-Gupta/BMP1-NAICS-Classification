@@ -34,8 +34,8 @@ async def main():
     print("Starting Scraper and Summarizer...")
     
     try:
-        # Load data - processing a small batch for testing is recommended
-        df = pd.read_csv(INPUT_FILE).head(10)
+        # Load data
+        df = pd.read_csv(INPUT_FILE)
     except FileNotFoundError:
         print(f"Error: {INPUT_FILE} not found.")
         return
