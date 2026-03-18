@@ -2,6 +2,7 @@ import asyncio
 import pandas as pd
 import logging
 import warnings
+import os
 from playwright.async_api import async_playwright
 from webscraping.scraping_utils import get_content
 from webscraping.qwen import QwenLLM
@@ -13,18 +14,16 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # CONFIG
 INPUT_FILE = 'data/NAICS_data_with_websites.csv'
 OUTPUT_FILE = 'website_summaries.csv'
-MAX_CONCURRENT_TABS = 5  # How many tabs open at once
-BATCH_SIZE = 50          # How many URLs to process before pausing/saving
+MAX_CONCURRENT_TABS = 5 
+BATCH_SIZE = 20 
 
 # Initialize LLM
 qwen = QwenLLM()
 
 async def async_summarize(text):
-    """Wraps the LLM call to prevent blocking the event loop."""
     if not isinstance(text, str) or len(text.strip()) < 50:
         return "Insufficient content for summary."
     try:
-        # Run the sync LLM call in a thread pool to keep the loop moving
         return await asyncio.to_thread(qwen.invoke, text)
     except Exception as e:
         return f"Summary failed: {str(e)}"
@@ -32,20 +31,38 @@ async def async_summarize(text):
 async def main():
     print("--- Starting Scraper and Summarizer ---")
     
-    try:
+    # LOAD DATA & FIND STARTING INDEX
+    if os.path.exists(OUTPUT_FILE):
+        print(f"Found existing output. Loading {OUTPUT_FILE}...")
+        df = pd.read_csv(OUTPUT_FILE)
+    else:
+        if not os.path.exists(INPUT_FILE):
+            print(f"Error: {INPUT_FILE} not found.")
+            return
+        print(f"Starting fresh from {INPUT_FILE}...")
         df = pd.read_csv(INPUT_FILE)
-        print(f"Successfully loaded {len(df)} rows from {INPUT_FILE}")
-    except FileNotFoundError:
-        print(f"Error: {INPUT_FILE} not found.")
+        df['scraped_text'] = None
+        df['summary'] = None
+
+    # Find where to resume (first row with an empty/NaN summary)
+    empty_mask = df['summary'].isna() | (df['summary'] == "")
+    
+    if not empty_mask.any():
+        print("All items have been processed!")
         return
 
-    urls = df['Insured Website'].tolist()
-    all_scraped_content = []
-    all_summaries = []
+    # .idxmax() returns the index of the first True value in the mask
+    start_index = empty_mask.idxmax()
+    
+    # Slice the dataframe indices from the start_index to the end
+    indices_to_process = df.index[start_index:].tolist()
+    total_to_do = len(indices_to_process)
 
+    print(f"Resuming at index {start_index}. {total_to_do} items remaining.")
+
+    # RUN SCRAPING & SUMMARIZING
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        # Use a single context, but we will manage page closure strictly
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...",
             viewport={'width': 1920, 'height': 1080}
@@ -53,35 +70,36 @@ async def main():
 
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_TABS)
 
-        async def sem_task(url, index):
+        async def sem_task(url, current_count, total):
             async with semaphore:
-                print(f"[{index+1}/{len(urls)}] Scraping: {url}")
+                print(f"[{current_count+1}/{total}] Scraping: {url}")
                 return await get_content(context, url)
 
-        # Process in Batches to prevent memory crashes
-        for i in range(0, len(urls), BATCH_SIZE):
-            batch_urls = urls[i : i + BATCH_SIZE]
-            print(f"\n--- Processing Batch {i//BATCH_SIZE + 1} ({len(batch_urls)} URLs) ---")
+        # Process exactly from where we left off
+        for i in range(0, total_to_do, BATCH_SIZE):
+            batch_indices = indices_to_process[i : i + BATCH_SIZE]
+            batch_urls = df.loc[batch_indices, 'Insured Website'].tolist()
+            
+            print(f"\n--- Processing Batch {i//BATCH_SIZE + 1} ---")
             
             # Scrape Batch
-            batch_results = await asyncio.gather(
-                *[sem_task(u, i + idx) for idx, u in enumerate(batch_urls)]
+            scraped_results = await asyncio.gather(
+                *[sem_task(u, i + idx, total_to_do) for idx, u in enumerate(batch_urls)]
             )
-            all_scraped_content.extend(batch_results)
-
-            # Summarize Batch (Sequential to avoid OOM on Local GPU/CPU)
-            print(f"Summarizing Batch {i//BATCH_SIZE + 1}...")
-            for idx, text in enumerate(batch_results):
-                current_url = batch_urls[idx]
-                summary = await async_summarize(text)
-                all_summaries.append(summary)
             
-            # 3. Intermediate Save (Optional but recommended for large datasets)
-            temp_df = df.iloc[:len(all_summaries)].copy()
-            temp_df['scraped_text'] = all_scraped_content
-            temp_df['summary'] = all_summaries
-            temp_df.to_csv(OUTPUT_FILE, index=False)
-            print(f"Progress saved to {OUTPUT_FILE}")
+            # Update main DF with scrapes
+            df.loc[batch_indices, 'scraped_text'] = scraped_results
+
+            # Summarize Batch sequentially
+            print(f"Summarizing batch of {len(scraped_results)}...")
+            for idx, text in enumerate(scraped_results):
+                real_idx = batch_indices[idx]
+                summary = await async_summarize(text)
+                df.loc[real_idx, 'summary'] = summary
+            
+            # Overwrite the CSV with the updated DataFrame
+            df.to_csv(OUTPUT_FILE, index=False)
+            print(f"Checkpoint saved: {i + len(batch_indices)}/{total_to_do} remaining items completed.")
 
         await browser.close()
 
