@@ -2,9 +2,9 @@
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH --mem=64g
-#SBATCH -J "gqp_webscraping"
-#SBATCH -o gqp_webscraping%j.out
-#SBATCH -e gqp_webscraping%j.err
+#SBATCH -J "val_webscraping"
+#SBATCH -o val_webscraping%j.out
+#SBATCH -e val_webscraping%j.err
 #SBATCH -p short
 #SBATCH -t 24:00:00
 #SBATCH --gres=gpu:H200:1
