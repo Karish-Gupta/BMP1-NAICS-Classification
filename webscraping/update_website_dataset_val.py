@@ -12,8 +12,8 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 # CONFIG
-INPUT_FILE = 'data/NAICS_data_with_websites.csv'
-OUTPUT_FILE = 'website_summaries.csv'
+INPUT_FILE = 'data/split_data/val.csv'
+OUTPUT_FILE = 'website_summaries_val.csv'
 MAX_CONCURRENT_TABS = 5 
 
 # Initialize LLM

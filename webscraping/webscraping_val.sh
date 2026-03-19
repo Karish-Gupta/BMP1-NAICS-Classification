@@ -5,8 +5,8 @@
 #SBATCH -J "gqp_webscraping"
 #SBATCH -o gqp_webscraping%j.out
 #SBATCH -e gqp_webscraping%j.err
-#SBATCH -p short
-#SBATCH -t 20:00:00
+#SBATCH -p long
+#SBATCH -t 24:00:00
 #SBATCH --gres=gpu:H200:1
 
 cd $SLURM_SUBMIT_DIR/..
@@ -25,5 +25,5 @@ pip install playwright
 
 playwright install 
 
-python -m webscraping.update_website_dataset
+python -m webscraping.update_website_dataset_val
 
