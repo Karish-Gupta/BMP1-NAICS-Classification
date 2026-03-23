@@ -2,9 +2,9 @@
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH --mem=64g
-#SBATCH -J "val_webscraping"
-#SBATCH -o val_webscraping%j.out
-#SBATCH -e val_webscraping%j.err
+#SBATCH -J "train_webscraping"
+#SBATCH -o train_webscraping%j.out
+#SBATCH -e train_webscraping%j.err
 #SBATCH -p short
 #SBATCH -t 24:00:00
 #SBATCH --gres=gpu:H200:1
@@ -25,5 +25,5 @@ pip install playwright
 
 playwright install 
 
-python -m webscraping.update_website_dataset_val
+python -m webscraping.update_website_dataset_train_part_6
 

@@ -25,5 +25,6 @@ pip install playwright
 
 playwright install 
 
-python -m webscraping.update_website_dataset_train
+python -m webscraping.update_website_dataset_train_part_8
+
 

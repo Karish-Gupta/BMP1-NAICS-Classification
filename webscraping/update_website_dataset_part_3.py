@@ -12,8 +12,8 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 # CONFIG
-INPUT_FILE = 'data/split_data/test.csv'
-OUTPUT_FILE = 'website_summaries_test.csv'
+INPUT_FILE = 'data/split_data/unprocessed_data_part_3.csv'
+OUTPUT_FILE = 'website_summaries_train_part_3.csv'
 MAX_CONCURRENT_TABS = 5 
 BATCH_SIZE = 20 
 
