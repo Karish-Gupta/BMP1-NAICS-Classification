@@ -1,4 +1,5 @@
 /data
+/webscraping/data
 .venv
 __pycache__
 unsloth_compiled_cache
