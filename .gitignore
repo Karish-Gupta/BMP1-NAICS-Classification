@@ -1,4 +1,5 @@
 /data
+web-scraping/qwen/.env
 /webscraping/data
 .venv
 __pycache__
