@@ -7,7 +7,7 @@
 #SBATCH -e 1_train_webscraping%j.err
 #SBATCH -p short
 #SBATCH -t 24:00:00
-#SBATCH --gres=gpu:H200:1
+#SBATCH --gres=gpu:A100:1
 
 cd $SLURM_SUBMIT_DIR/..
 
