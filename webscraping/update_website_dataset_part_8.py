@@ -42,17 +42,12 @@ async def main():
         print(f"Starting fresh from {INPUT_FILE}...")
         df = pd.read_csv(INPUT_FILE)
 
-    # Ensure necessary columns exist
-    if 'scraped_text' not in df.columns:
-        df['scraped_text'] = None
+    # Ensure summary column exists
     if 'summary' not in df.columns:
         df['summary'] = None
 
-    # FIND STARTING INDICES
-    empty_mask = (
-        (df['summary'].isna() | (df['summary'].astype(str).str.strip() == "")) &
-        (df['scraped_text'].isna() | (df['scraped_text'].astype(str).str.strip() == ""))
-    )
+    # FIND STARTING INDICES - only check for empty summaries
+    empty_mask = (df['summary'].isna() | (df['summary'].astype(str).str.strip() == ""))
     
     indices_to_process = df.index[empty_mask].tolist()
     total_to_do = len(indices_to_process)
@@ -78,32 +73,27 @@ async def main():
                 print(f"[{current_count}/{total}] Scraping: {url}")
                 return await get_content(context, url)
 
-        # Process the filtered list of indices in batches
         for i in range(0, total_to_do, BATCH_SIZE):
             batch_indices = indices_to_process[i : i + BATCH_SIZE]
             batch_urls = df.loc[batch_indices, 'Insured Website'].tolist()
             
             print(f"\n--- Processing Batch {i//BATCH_SIZE + 1} ({len(batch_indices)} items) ---")
             
-            # Scrape Batch
-            # Using i + idx + 1 for a 1-based progress counter in logs
+            # Scrape Batch into local variable only
             scraped_results = await asyncio.gather(
                 *[sem_task(u, i + idx + 1, total_to_do) for idx, u in enumerate(batch_urls)]
             )
             
-            # Update main DF with scrapes
-            df.loc[batch_indices, 'scraped_text'] = scraped_results
-
-            # Summarize Batch sequentially
+            # Summarize Batch and update DF
             print(f"Summarizing batch...")
             for idx, text in enumerate(scraped_results):
                 real_idx = batch_indices[idx]
                 summary = await async_summarize(text)
                 df.loc[real_idx, 'summary'] = summary
             
-            # Overwrite the CSV with the updated DataFrame
+            # Overwrite the CSV
             df.to_csv(OUTPUT_FILE, index=False)
-            print(f"Checkpoint saved: {i + len(batch_indices)}/{total_to_do} items from this run completed.")
+            print(f"Checkpoint saved: {i + len(batch_indices)}/{total_to_do} items completed.")
 
         await browser.close()
 
