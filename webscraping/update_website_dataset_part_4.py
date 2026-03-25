@@ -8,8 +8,8 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 # CONFIG
-INPUT_FILE = 'data/split_data/test.csv'
-OUTPUT_FILE = 'website_summaries_test.csv'
+INPUT_FILE = 'data/train_data/unprocessed_data_part_4.csv'
+OUTPUT_FILE = 'website_summaries_train_part_4.csv'
 
 if __name__ == "__main__":
     asyncio.run(append_business_description_data(INPUT_FILE, OUTPUT_FILE))
