@@ -7,9 +7,9 @@ from model.multi_head_model.dataset import NAICSDataset
 from model.multi_head_model.loss import HierarchicalLoss
 
 # Load data
-train_df = pd.read_csv("data/split_data_preprocessed/train_data_with_summaries.csv", encoding="cp1252") 
-test_df = pd.read_csv("data/split_data_preprocessed/test_data_with_summaries.csv", encoding="cp1252")
-val_df = pd.read_csv("data/split_data_preprocessed/val_data_with_summaries.csv", encoding="cp1252")
+train_df = pd.read_csv("data/split_data_preprocessed/train_data_with_summaries.csv", encoding="cp1252", encoding_errors="replace") 
+test_df = pd.read_csv("data/split_data_preprocessed/test_data_with_summaries.csv", encoding="cp1252", encoding_errors="replace")
+val_df = pd.read_csv("data/split_data_preprocessed/val_data_with_summaries.csv", encoding="cp1252", encoding_errors="replace")
 
 # Initialize Datasets
 train_dataset = NAICSDataset(train_df, model_name="answerdotai/ModernBERT-large")
