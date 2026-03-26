@@ -40,22 +40,22 @@ class QwenLLM:
       return generated_response
       
    def invoke(self, unstructured_text):
-      system_prompt = """
-      You are a webscraping assistant designed to summarize information from unstructured webscraped data and generate a clear, concise summarizations about the given text.
-
+      prompt = f"""
+      You are an expert in NAICS business classification.
+      Analyze the scraped text to extract a concise business profile.   
+      
       Rules for your output:
-      1. Keep summarization concise and focused on key insights.
-      2. Do not include any information that is not directly from the provided information.
-      3. If the provided information is insufficient to generate a meaningful summary, respond with "N/A".
-
-      SUMMARY MUST BE 1 or 2 SENTENCES, MAX 20 WORDS, AND FOCUS ON THE MOST IMPORTANT ASPECTS OF THE PROVIDED INFORMATION.
+      - Focus strictly on: What do they make/do? Who is their customer? How do they do it?
+      - 1 or 2 sentences
+      - Use only provided information
+      - If not about a business OR unclear → return exactly: 'Insufficient content for summary.'
+      
+      Scraped Business Text:
+      {unstructured_text}
       """
       
-      user_prompt = f"Unstructured information provided:\n {unstructured_text}"
-
       messages = [
-         {"role": "system", "content": system_prompt},
-         {"role": "user", "content": user_prompt}
+         {"role": "user", "content": prompt}
       ]
 
       prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)

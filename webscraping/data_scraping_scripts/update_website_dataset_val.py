@@ -1,0 +1,15 @@
+import asyncio
+import logging
+import warnings
+from webscraping.scraping_utils import append_business_description_data
+
+# Suppress logging noise
+logging.getLogger("transformers").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+# CONFIG
+INPUT_FILE = 'data/split_data/val.csv'
+OUTPUT_FILE = 'website_summaries_val.csv'
+
+if __name__ == "__main__":
+    asyncio.run(append_business_description_data(INPUT_FILE, OUTPUT_FILE))
