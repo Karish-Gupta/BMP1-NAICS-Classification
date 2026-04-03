@@ -86,11 +86,11 @@ def run_full_evaluation(self, test_df):
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ordered_steps = [
-        "step1_sector", 
-        "step2_subsector", 
-        "step3_industry_group", 
-        "step4_industry", 
-        "step5_national_industry"
+        "sector", 
+        "subsector", 
+        "industry_group", 
+        "industry", 
+        "national_industry"
     ]
 
     evaluator = SequentialPipeline(ordered_steps, device)
