@@ -28,5 +28,6 @@ pip install transformers
 pip install datasets
 pip install tqdm
 pip install scikit-learn
+pip install joblib
 
 python -m model.sequential_model.sub_model_training.train_industry
