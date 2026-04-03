@@ -3,7 +3,7 @@ from transformers import AutoTokenizer
 import pandas as pd
 import joblib
 from model.sequential_model.sub_model import SequentialSubModel
-
+from model.sequential_model.dataset import NAICSHierarchyDataset
 
 def run_training(step_name, train_csv, val_csv, test_csv, epochs, lr, batch_size):
     # Setup Device
