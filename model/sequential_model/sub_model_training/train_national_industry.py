@@ -9,4 +9,4 @@ epochs = 5
 lr = 2e-5
 batch_size = 32
 
-run_training(step_name=step_name, train_csv=train_csv, val_csv=val_csv, epochs=epochs, lr=lr, batch_size=batch_size)
+run_training(step_name=step_name, train_csv=train_csv, val_csv=val_csv, test_csv=test_csv, epochs=epochs, lr=lr, batch_size=batch_size)
