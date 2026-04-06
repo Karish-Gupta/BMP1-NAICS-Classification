@@ -96,7 +96,7 @@ if __name__ == "__main__":
     evaluator = SequentialPipeline(ordered_steps, device)
     
     # Load your test data
-    test_df = pd.read_csv("data/split_data_preprocessed/test_data_with_summaries.csv")
+    test_df = pd.read_csv("data/split_data_preprocessed/test_data_only_summaries.csv")
     
     # Run Evaluation
     metrics_report = evaluator.run_full_evaluation(test_df)
