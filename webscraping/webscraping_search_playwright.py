@@ -86,6 +86,7 @@ async def process_businesses():
                 summary = call_llm_for_summary(business_name, cleaned_text)
                 df.at[index, 'summary'] = summary
                 print("  -> Summary generated.")
+                print(f"  -> Summary: {summary}...")  # Print first 100 chars of summary for verification
 
             except Exception as e:
                 print(f"  -> Error processing {business_name}: {e}")
