@@ -6,7 +6,7 @@
 #SBATCH -o test_webscraping%j.out
 #SBATCH -e test_webscraping%j.err
 #SBATCH -p short
-#SBATCH -t 2:00:00
+#SBATCH -t 24:00:00
 #SBATCH --gres=gpu:H200:1
 
 cd $SLURM_SUBMIT_DIR/..
