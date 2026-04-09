@@ -1,6 +1,5 @@
-from unsloth import FastLanguageModel
+from vllm import LLM, SamplingParams
 from huggingface_hub import login
-import torch
 import os
 
 # Login to HF CLI
@@ -9,36 +8,24 @@ if "HF_TOKEN" in os.environ:
 
 class QwenLLM:
    def __init__(self, model_name="Qwen/Qwen3-14B"):
-      self.model, self.tokenizer = FastLanguageModel.from_pretrained(
-         model_name = model_name,
-         max_seq_length = 2048,
-         dtype = None,
-         load_in_4bit = True,
+      # Initialize vLLM with 4-bit quantization to replace unsloth's load_in_4bit
+      self.llm = LLM(
+         model=model_name,
+         quantization="bitsandbytes",
+         load_format="bitsandbytes",
+         max_model_len=4096, # Ensures enough context for input (2048) + output (2048)
+         trust_remote_code=True,
+         enforce_eager=True # Recommended for local Windows setups to prevent CUDA graph crashes
       )
       
-      FastLanguageModel.for_inference(self.model)
-      self.model.eval()
-      print(f"Model {model_name} loaded successfully.")
-      
-   def generate(self, prompt):
-      inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
-   
-      # Generate
-      with torch.no_grad():
-         outputs = self.model.generate(
-               **inputs, 
-               max_new_tokens=2048, 
-               temperature=0.1,
-               top_p=0.95,
-               do_sample=True,
-               pad_token_id=self.tokenizer.pad_token_id
-         )
-
-      generated_tokens = outputs[0][inputs.input_ids.shape[1]:]
-      generated_response = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)
-
-      return generated_response
-      
+      # Generation parameters
+      self.sampling_params = SamplingParams(
+         temperature=0.1,
+         top_p=0.95,
+         max_tokens=2048,
+      )
+      print(f"Model {model_name} loaded successfully via vLLM.")
+         
    def invoke(self, unstructured_text):
       prompt = f"""
       You are an expert in NAICS business classification.
@@ -57,18 +44,20 @@ class QwenLLM:
       messages = [
          {"role": "user", "content": prompt}
       ]
-
-      prompt = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
       
-      raw_response = self.generate(prompt)
+      # vLLM's chat API automatically applies the tokenizer's chat template
+      outputs = self.llm.chat(
+         messages=messages,
+         sampling_params=self.sampling_params,
+         use_tqdm=False 
+      )
+      
+      raw_response = outputs[0].outputs[0].text
       
       # Isolate the actual response from the thought process
       if "</think>" in raw_response:
-         # We take everything after the first occurrence of </think>
          actual_output = raw_response.split("</think>", 1)[1].strip()
       else:
          actual_output = raw_response.strip()
 
-      actual_output = actual_output.replace("<|im_end|>", "").strip() # Remove any generation prompt artifacts
-      
-      return actual_output
+      return actual_output.replace("<|im_end|>", "").strip()

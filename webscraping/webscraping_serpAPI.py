@@ -19,28 +19,23 @@ MAX_CHARS = 6000
 BATCH_SIZE = 15              # How many rows to process before saving a checkpoint
 MAX_CONCURRENT_TABS = 5      # How many browser tabs to open at once
 TIMEOUT = 15000              # 15 seconds for page loads
-CREDIT_LIMIT = 30000
+CREDIT_LIMIT = 1 # For testing
 
 qwen = QwenLLM()
 
-def call_llm_for_summary(scraped_text):
-    """
-    Call local llm for summarization
-    """
-    # Simulated response
-    if not scraped_text or len(scraped_text) < 50:
-        return "Not enough information to summarize."
-    
-    return qwen.invoke(scraped_text)
-
-# Shared state to track API usage safely across async tasks
-state = {"credits_used": 0}
+# Shared state to track API usage and early exits
+state = {"credits_used": 0, "limit_reached": False}
 
 async def async_get_url_from_serpapi(business_name, address):
-    """Asynchronously calls SerpAPI to find the missing website link."""
+    """Asynchronously calls SerpAPI to find the website link."""
     if state["credits_used"] >= CREDIT_LIMIT:
-        print(f"  [!] SerpAPI limit ({CREDIT_LIMIT}) reached. Skipping search for {business_name}.")
+        if not state["limit_reached"]:
+            print(f"\n[!] LIMIT REACHED: {CREDIT_LIMIT} credits used. Flagging script to halt.")
+            state["limit_reached"] = True
         return None
+
+    # PRE-EMPTIVELY claim the credit to prevent concurrent tasks from bypassing the limit
+    state["credits_used"] += 1
 
     query = f'"{business_name}" {address}'
     url = f"https://serpapi.com/search.json?engine=google&q={query}&api_key={SERPAPI_KEY}&num=3"
@@ -49,25 +44,27 @@ async def async_get_url_from_serpapi(business_name, address):
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=10) as response:
                 if response.status == 200:
-                    state["credits_used"] += 1
                     data = await response.json()
                     if "organic_results" in data and len(data["organic_results"]) > 0:
                         return data["organic_results"][0].get("link")
-        return None
+        
+        # If we get here, no valid link was found, but it was a successful API call.
+        return None 
+        
     except Exception as e:
+        # REFUND the credit if the API call actually crashed/failed
+        state["credits_used"] -= 1 
         print(f"  [!] SerpAPI request failed: {e}")
         return None
 
 async def get_content(context, url: str) -> str:
     """Scrapes paragraph text with retry logic and error handling."""
-    # Try twice: once with https, once with http if it fails
     for attempt in range(2):
         page = await context.new_page()
         try:
             await page.goto(url, timeout=TIMEOUT, wait_until="domcontentloaded")
-            await asyncio.sleep(1) # Wait for a moment to let dynamic scripts run
+            await asyncio.sleep(1) 
 
-            # 1. Try to get all <p> tags (the best source for business descriptions)
             elements = await page.locator('p').all()
             paragraphs = []
             for p in elements:
@@ -79,10 +76,8 @@ async def get_content(context, url: str) -> str:
                 except:
                     continue
             
-            # 2. Join paragraphs
             content = " ".join(paragraphs).strip()
 
-            # 3. Fallback: If no <p> tags found, grab the body text
             if not content or len(content) < 100:
                 body_text = await page.inner_text('body', timeout=5000)
                 content = re.sub(r'\s+', ' ', body_text).strip()
@@ -92,7 +87,6 @@ async def get_content(context, url: str) -> str:
             
         except (PlaywrightTimeout, Exception) as e:
             if attempt == 0:
-                # If https failed, try http
                 url = url.replace("https://", "http://")
             else:
                 print(f"  [!] Failed to scrape {url} | Reason: {type(e).__name__}")
@@ -106,7 +100,6 @@ async def async_summarize(text):
     if not isinstance(text, str) or len(text.strip()) < 50:
         return "Insufficient content for summary."
     try:
-        # to_thread is crucial here so your local LLM doesn't freeze the scraping queue
         return await asyncio.to_thread(qwen.invoke, text)
     except Exception as e:
         return f"Summary failed: {str(e)}"
@@ -114,7 +107,6 @@ async def async_summarize(text):
 async def append_business_description_data():
     print("--- Starting Scraper and Summarizer ---")
     
-    # 1. LOAD DATA
     if os.path.exists(OUTPUT_FILE):
         print(f"Found existing output. Loading {OUTPUT_FILE}...")
         df = pd.read_csv(OUTPUT_FILE, dtype={'summary': object})
@@ -125,12 +117,10 @@ async def append_business_description_data():
         print(f"Starting fresh from {INPUT_FILE}...")
         df = pd.read_csv(INPUT_FILE)
     
-    # Ensure summary column exists
     if 'summary' not in df.columns:
         df['summary'] = None
     df['summary'] = df['summary'].astype(object)
 
-    # 2. FIND STARTING INDICES (Only target empty summaries)
     empty_mask = (df['summary'].isna() | (df['summary'].astype(str).str.strip() == ""))
     indices_to_process = df.index[empty_mask].tolist()
     total_to_do = len(indices_to_process)
@@ -141,7 +131,6 @@ async def append_business_description_data():
 
     print(f"Found {total_to_do} empty items. First target index: {indices_to_process[0]}")
 
-    # 3. RUN ASYNC SCRAPING & SUMMARIZING
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
@@ -151,17 +140,15 @@ async def append_business_description_data():
 
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_TABS)
 
-        async def sem_task(business_name, address, url, current_count, total):
+        # Removed 'url' parameter - we only care about searching now
+        async def sem_task(business_name, address, current_count, total):
             async with semaphore:
-                # Clean URL / Check for NaN
-                is_valid_url = isinstance(url, str) and url.strip() != "" and str(url).lower() != "nan"
+                if state["limit_reached"]:
+                    return ""
                 
-                # If no valid URL in dataset, hit SerpAPI
-                if not is_valid_url:
-                    print(f"[{current_count}/{total}] No URL. Searching SerpAPI for: {business_name}")
-                    url = await async_get_url_from_serpapi(business_name, address)
+                print(f"[{current_count}/{total}] Searching SerpAPI for: {business_name}")
+                url = await async_get_url_from_serpapi(business_name, address)
                 
-                # Format URL if we found/have one
                 if url:
                     url = url.strip().lower()
                     if not url.startswith(('http://', 'https://')):
@@ -172,13 +159,11 @@ async def append_business_description_data():
                 else:
                     return ""
 
-        # 4. BATCH PROCESSING LOOP
         for i in range(0, total_to_do, BATCH_SIZE):
             batch_indices = indices_to_process[i : i + BATCH_SIZE]
             
             print(f"\n--- Processing Batch {i//BATCH_SIZE + 1} ({len(batch_indices)} items) ---")
             
-            # Create concurrent tasks for scraping/searching
             tasks = []
             for idx, real_idx in enumerate(batch_indices):
                 row = df.loc[real_idx]
@@ -186,26 +171,33 @@ async def append_business_description_data():
                     sem_task(
                         business_name=row['Business_Name'],
                         address=row['FULL_ADDRESS'],
-                        url=row['Insured Website'],
                         current_count=i + idx + 1,
                         total=total_to_do
                     )
                 )
             
-            # Execute batch scraping
             scraped_results = await asyncio.gather(*tasks)
             
-            # Summarize Batch and update DataFrame
             print(f"Summarizing batch with local LLM...")
             for idx, text in enumerate(scraped_results):
                 real_idx = batch_indices[idx]
-                summary = await async_summarize(text)
-                df.loc[real_idx, 'summary'] = summary
+                
+                # ONLY summarize and update if we actually got text back
+                if text and text.strip():
+                    summary = await async_summarize(text)
+                    df.loc[real_idx, 'summary'] = summary
+                else:
+                    # Leave the cell as NaN/None so the next run tries again!
+                    print(f"  -> Skipped updating row {real_idx} (no text extracted or limit reached)")
             
-            # Overwrite the CSV
             df.to_csv(OUTPUT_FILE, index=False)
             print(f"Checkpoint saved: {i + len(batch_indices)}/{total_to_do} items completed.")
             print(f"SerpAPI Credits Used So Far: {state['credits_used']}")
+
+            # --- EARLY EXIT CHECK ---
+            if state["limit_reached"]:
+                print("\n[!] Halting script execution to protect API limit.")
+                break
 
         await browser.close()
 
@@ -213,8 +205,8 @@ async def append_business_description_data():
     print(f"Total SerpAPI Credits used this session: {state['credits_used']}")
 
 if __name__ == "__main__":
-    # Windows-specific fix for asyncio event loops (prevents "Event loop is closed" errors)
+    # Playwright on Windows requires the default Proactor event loop to launch browsers
     if os.name == 'nt':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
         
     asyncio.run(append_business_description_data())
