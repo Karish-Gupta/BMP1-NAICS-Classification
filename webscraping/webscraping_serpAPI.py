@@ -19,7 +19,7 @@ MAX_CHARS = 6000
 BATCH_SIZE = 15              # How many rows to process before saving a checkpoint
 MAX_CONCURRENT_TABS = 5      # How many browser tabs to open at once
 TIMEOUT = 15000              # 15 seconds for page loads
-CREDIT_LIMIT = 1 # For testing
+CREDIT_LIMIT = 5000
 
 qwen = QwenLLM()
 
