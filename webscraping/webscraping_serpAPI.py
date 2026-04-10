@@ -9,7 +9,6 @@ from webscraping.qwen import QwenLLM
 
 dotenv.load_dotenv()
 
-
 # CONFIG
 SERPAPI_KEY = os.getenv("SERP_API_KEY")
 INPUT_FILE = "data/split_data_with_summaries/train_with_summaries.csv"
@@ -21,18 +20,22 @@ MAX_CONCURRENT_TABS = 5      # How many browser tabs to open at once
 TIMEOUT = 15000              # 15 seconds for page loads
 CREDIT_LIMIT = 5000
 
+if not SERPAPI_KEY:
+    print("\n[!] CRITICAL ERROR: SERP_API_KEY is missing. Check your .env file.")
+    exit()
+
 qwen = QwenLLM()
 
 # Shared state to track API usage and early exits
 state = {"credits_used": 0, "limit_reached": False}
 
-async def async_get_url_from_serpapi(business_name, address):
-    """Asynchronously calls SerpAPI to find the website link."""
+async def async_get_urls_from_serpapi(business_name, address):
+    """Asynchronously calls SerpAPI to find the top 3 website links and a fallback snippet."""
     if state["credits_used"] >= CREDIT_LIMIT:
         if not state["limit_reached"]:
             print(f"\n[!] LIMIT REACHED: {CREDIT_LIMIT} credits used. Flagging script to halt.")
             state["limit_reached"] = True
-        return None
+        return [], "" # Return empty list and empty snippet
 
     # PRE-EMPTIVELY claim the credit to prevent concurrent tasks from bypassing the limit
     state["credits_used"] += 1
@@ -45,17 +48,32 @@ async def async_get_url_from_serpapi(business_name, address):
             async with session.get(url, timeout=10) as response:
                 if response.status == 200:
                     data = await response.json()
+                    urls = []
+                    fallback_snippet = ""
+                    
                     if "organic_results" in data and len(data["organic_results"]) > 0:
-                        return data["organic_results"][0].get("link")
-        
-        # If we get here, no valid link was found, but it was a successful API call.
-        return None 
+                        # Save the top result's snippet as our ultimate fallback
+                        fallback_snippet = data["organic_results"][0].get("snippet", "")
+                        
+                        # Extract up to 3 URLs
+                        for result in data["organic_results"][:3]:
+                            if "link" in result:
+                                urls.append(result["link"])
+                                
+                    return urls, fallback_snippet
+                else:
+                    error_text = await response.text()
+                    print(f"  [!] SerpAPI Error {response.status}: {error_text}")
+                    state["credits_used"] -= 1 
+                    return [], ""
+                    
+        return [], "" 
         
     except Exception as e:
         # REFUND the credit if the API call actually crashed/failed
         state["credits_used"] -= 1 
         print(f"  [!] SerpAPI request failed: {e}")
-        return None
+        return [], ""
 
 async def get_content(context, url: str) -> str:
     """Scrapes paragraph text with retry logic and error handling."""
@@ -140,22 +158,40 @@ async def append_business_description_data():
 
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_TABS)
 
-        # Removed 'url' parameter - we only care about searching now
         async def sem_task(business_name, address, current_count, total):
             async with semaphore:
                 if state["limit_reached"]:
                     return ""
                 
                 print(f"[{current_count}/{total}] Searching SerpAPI for: {business_name}")
-                url = await async_get_url_from_serpapi(business_name, address)
                 
-                if url:
-                    url = url.strip().lower()
-                    if not url.startswith(('http://', 'https://')):
-                        url = "https://" + url
+                # Fetch up to 3 URLs and the #1 snippet
+                urls, fallback_snippet = await async_get_urls_from_serpapi(business_name, address)
+                
+                if urls:
+                    # Loop through the URLs one by one
+                    for i, url in enumerate(urls):
+                        url = url.strip().lower()
+                        if not url.startswith(('http://', 'https://')):
+                            url = "https://" + url
+                            
+                        print(f"[{current_count}/{total}] Scraping Attempt {i+1}/3: {url}")
+                        scraped_text = await get_content(context, url)
                         
-                    print(f"[{current_count}/{total}] Scraping: {url}")
-                    return await get_content(context, url)
+                        # If we get good text, stop searching and return it!
+                        if scraped_text and len(scraped_text) > 50:
+                            return scraped_text
+                            
+                        # If it failed, print a message and let the loop try the next URL
+                        if i < len(urls) - 1:
+                            print(f"  -> Scrape failed for {url}. Trying next link...")
+                        else:
+                            print(f"  -> All 3 links failed to scrape for {business_name}.")
+
+                # THE ULTIMATE FALLBACK: If we have no URLs, or all 3 scrapes failed
+                if fallback_snippet:
+                    print(f"  -> Falling back to Google snippet for {business_name}.")
+                    return fallback_snippet
                 else:
                     return ""
 
@@ -182,12 +218,11 @@ async def append_business_description_data():
             for idx, text in enumerate(scraped_results):
                 real_idx = batch_indices[idx]
                 
-                # ONLY summarize and update if we actually got text back
+                # ONLY summarize and update if we actually got text back (or a snippet)
                 if text and text.strip():
                     summary = await async_summarize(text)
                     df.loc[real_idx, 'summary'] = summary
                 else:
-                    # Leave the cell as NaN/None so the next run tries again!
                     print(f"  -> Skipped updating row {real_idx} (no text extracted or limit reached)")
             
             df.to_csv(OUTPUT_FILE, index=False)
