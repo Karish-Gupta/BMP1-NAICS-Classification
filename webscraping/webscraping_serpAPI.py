@@ -139,7 +139,11 @@ async def append_business_description_data():
         df['summary'] = None
     df['summary'] = df['summary'].astype(object)
 
-    empty_mask = (df['summary'].isna() | (df['summary'].astype(str).str.strip() == ""))
+    empty_mask = (
+        df['summary'].isna() | 
+        (df['summary'].astype(str).str.strip() == "") | 
+        (df['summary'].astype(str).str.contains("Insufficient content for summary", case=False, na=False))
+    )
     indices_to_process = df.index[empty_mask].tolist()
     total_to_do = len(indices_to_process)
 
