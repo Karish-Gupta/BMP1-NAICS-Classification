@@ -11,14 +11,14 @@ dotenv.load_dotenv()
 
 # CONFIG
 SERPAPI_KEY = os.getenv("SERP_API_KEY")
-INPUT_FILE = "data/split_data_with_summaries/train_with_summaries.csv"
-OUTPUT_FILE = "serp_dataset_summarized.csv"
+INPUT_FILE = "data/split_data_with_summaries/test_with_summaries.csv"
+OUTPUT_FILE = "serp_dataset_summarized_test.csv"
 
 MAX_CHARS = 6000
 BATCH_SIZE = 15              # How many rows to process before saving a checkpoint
 MAX_CONCURRENT_TABS = 5      # How many browser tabs to open at once
 TIMEOUT = 15000              # 15 seconds for page loads
-CREDIT_LIMIT = 5000
+CREDIT_LIMIT = 500
 
 if not SERPAPI_KEY:
     print("\n[!] CRITICAL ERROR: SERP_API_KEY is missing. Check your .env file.")
