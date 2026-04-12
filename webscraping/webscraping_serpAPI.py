@@ -3,6 +3,7 @@ import aiohttp
 import pandas as pd
 import os
 import re
+import random
 import dotenv
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
 from webscraping.qwen import QwenLLM
@@ -11,14 +12,14 @@ dotenv.load_dotenv()
 
 # CONFIG
 SERPAPI_KEY = os.getenv("SERP_API_KEY")
-INPUT_FILE = "data/split_data_with_summaries/test_with_summaries.csv"
-OUTPUT_FILE = "serp_dataset_summarized_test.csv"
+INPUT_FILE = "data/split_data_with_summaries/train_with_summaries.csv"
+OUTPUT_FILE = "serp_dataset_summarized_train.csv"
 
 MAX_CHARS = 6000
 BATCH_SIZE = 15              # How many rows to process before saving a checkpoint
 MAX_CONCURRENT_TABS = 5      # How many browser tabs to open at once
 TIMEOUT = 15000              # 15 seconds for page loads
-CREDIT_LIMIT = 500
+CREDIT_LIMIT = 5000
 
 if not SERPAPI_KEY:
     print("\n[!] CRITICAL ERROR: SERP_API_KEY is missing. Check your .env file.")
@@ -30,7 +31,7 @@ qwen = QwenLLM()
 state = {"credits_used": 0, "limit_reached": False}
 
 async def async_get_urls_from_serpapi(business_name, address):
-    """Asynchronously calls SerpAPI to find the top 3 website links and a fallback snippet."""
+    """Asynchronously calls SerpAPI to find the top 5 website links and a fallback snippet."""
     if state["credits_used"] >= CREDIT_LIMIT:
         if not state["limit_reached"]:
             print(f"\n[!] LIMIT REACHED: {CREDIT_LIMIT} credits used. Flagging script to halt.")
@@ -41,7 +42,10 @@ async def async_get_urls_from_serpapi(business_name, address):
     state["credits_used"] += 1
 
     query = f'"{business_name}" {address}'
-    url = f"https://serpapi.com/search.json?engine=google&q={query}&api_key={SERPAPI_KEY}&num=3"
+    url = f"https://serpapi.com/search.json?engine=google&q={query}&api_key={SERPAPI_KEY}&num=5" # Changed to 5
+    
+    # Stagger the API calls by 0.1 to 1.5 seconds to prevent 401 Rate Limits from concurrency
+    await asyncio.sleep(random.uniform(0.1, 1.5))
     
     try:
         async with aiohttp.ClientSession() as session:
@@ -55,8 +59,8 @@ async def async_get_urls_from_serpapi(business_name, address):
                         # Save the top result's snippet as our ultimate fallback
                         fallback_snippet = data["organic_results"][0].get("snippet", "")
                         
-                        # Extract up to 3 URLs
-                        for result in data["organic_results"][:3]:
+                        # Extract up to 5 URLs
+                        for result in data["organic_results"][:5]: # Changed to 5
                             if "link" in result:
                                 urls.append(result["link"])
                                 
@@ -169,7 +173,7 @@ async def append_business_description_data():
                 
                 print(f"[{current_count}/{total}] Searching SerpAPI for: {business_name}")
                 
-                # Fetch up to 3 URLs and the #1 snippet
+                # Fetch up to 5 URLs and the #1 snippet
                 urls, fallback_snippet = await async_get_urls_from_serpapi(business_name, address)
                 
                 if urls:
@@ -179,7 +183,7 @@ async def append_business_description_data():
                         if not url.startswith(('http://', 'https://')):
                             url = "https://" + url
                             
-                        print(f"[{current_count}/{total}] Scraping Attempt {i+1}/3: {url}")
+                        print(f"[{current_count}/{total}] Scraping Attempt {i+1}/5: {url}")
                         scraped_text = await get_content(context, url)
                         
                         # If we get good text, stop searching and return it!
@@ -190,9 +194,9 @@ async def append_business_description_data():
                         if i < len(urls) - 1:
                             print(f"  -> Scrape failed for {url}. Trying next link...")
                         else:
-                            print(f"  -> All 3 links failed to scrape for {business_name}.")
+                            print(f"  -> All 5 links failed to scrape for {business_name}.")
 
-                # THE ULTIMATE FALLBACK: If we have no URLs, or all 3 scrapes failed
+                # THE ULTIMATE FALLBACK: If we have no URLs, or all 5 scrapes failed
                 if fallback_snippet:
                     print(f"  -> Falling back to Google snippet for {business_name}.")
                     return fallback_snippet
