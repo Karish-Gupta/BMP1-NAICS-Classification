@@ -12,14 +12,14 @@ dotenv.load_dotenv()
 
 # CONFIG
 SERPAPI_KEY = os.getenv("SERP_API_KEY")
-INPUT_FILE = "data/split_data_with_summaries/train_with_summaries.csv"
-OUTPUT_FILE = "serp_dataset_summarized_train.csv"
+INPUT_FILE = "data/split_data_with_summaries/test_with_summaries.csv"
+OUTPUT_FILE = "serp_dataset_summarized_test.csv"
 
 MAX_CHARS = 6000
 BATCH_SIZE = 15              # How many rows to process before saving a checkpoint
 MAX_CONCURRENT_TABS = 5      # How many browser tabs to open at once
 TIMEOUT = 15000              # 15 seconds for page loads
-CREDIT_LIMIT = 5000
+CREDIT_LIMIT = 500
 
 if not SERPAPI_KEY:
     print("\n[!] CRITICAL ERROR: SERP_API_KEY is missing. Check your .env file.")
@@ -42,42 +42,53 @@ async def async_get_urls_from_serpapi(business_name, address):
     state["credits_used"] += 1
 
     query = f'"{business_name}" {address}'
-    url = f"https://serpapi.com/search.json?engine=google&q={query}&api_key={SERPAPI_KEY}&num=5" # Changed to 5
+    url = f"https://serpapi.com/search.json?engine=google&q={query}&api_key={SERPAPI_KEY}&num=5"
     
-    # Stagger the API calls by 0.1 to 1.5 seconds to prevent 401 Rate Limits from concurrency
-    await asyncio.sleep(random.uniform(0.1, 1.5))
-    
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=10) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    urls = []
-                    fallback_snippet = ""
-                    
-                    if "organic_results" in data and len(data["organic_results"]) > 0:
-                        # Save the top result's snippet as our ultimate fallback
-                        fallback_snippet = data["organic_results"][0].get("snippet", "")
-                        
-                        # Extract up to 5 URLs
-                        for result in data["organic_results"][:5]: # Changed to 5
-                            if "link" in result:
-                                urls.append(result["link"])
-                                
-                    return urls, fallback_snippet
-                else:
-                    error_text = await response.text()
-                    print(f"  [!] SerpAPI Error {response.status}: {error_text}")
-                    state["credits_used"] -= 1 
-                    return [], ""
-                    
-        return [], "" 
+    # Try up to 3 times if we hit a 401 rate limit
+    for attempt in range(3):
+        # Stagger the API calls by 0.5 to 2.0 seconds to prevent 401 Rate Limits from concurrency
+        await asyncio.sleep(random.uniform(0.5, 2.0))
         
-    except Exception as e:
-        # REFUND the credit if the API call actually crashed/failed
-        state["credits_used"] -= 1 
-        print(f"  [!] SerpAPI request failed: {e}")
-        return [], ""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        urls = []
+                        fallback_snippet = ""
+                        
+                        if "organic_results" in data and len(data["organic_results"]) > 0:
+                            # Save the top result's snippet as our ultimate fallback
+                            fallback_snippet = data["organic_results"][0].get("snippet", "")
+                            
+                            # Extract up to 5 URLs
+                            for result in data["organic_results"][:5]:
+                                if "link" in result:
+                                    urls.append(result["link"])
+                                    
+                        return urls, fallback_snippet
+                        
+                    elif response.status == 401:
+                        # RATE LIMIT HIT: Print warning and loop back to try again
+                        print(f"  [!] SerpAPI 401 Rate Limit for '{business_name}'. Retrying ({attempt+1}/3)...")
+                        await asyncio.sleep(3) # Wait 3 seconds before hitting the API again
+                        continue 
+                        
+                    else:
+                        error_text = await response.text()
+                        print(f"  [!] SerpAPI Error {response.status}: {error_text}")
+                        state["credits_used"] -= 1 
+                        return [], ""
+                        
+        except Exception as e:
+            if attempt == 2: # Only print/fail if we've exhausted all 3 retries
+                state["credits_used"] -= 1 
+                print(f"  [!] SerpAPI request failed completely: {e}")
+                return [], ""
+            
+    # If the loop finishes all 3 attempts and still fails
+    state["credits_used"] -= 1 
+    return [], ""
 
 async def get_content(context, url: str) -> str:
     """Scrapes paragraph text with retry logic and error handling."""
