@@ -16,7 +16,7 @@ INPUT_FILE = "data/split_data_with_summaries/test_with_summaries.csv"
 OUTPUT_FILE = "serp_dataset_summarized_test.csv"
 
 START_INDEX = 10000           # Only process rows starting from this index
-CREDIT_LIMIT = 10000          # Total credits to use for this session
+CREDIT_LIMIT = 4000          # Total credits to use for this session
 MAX_CHARS = 6000
 BATCH_SIZE = 15              # Rows per checkpoint save
 MAX_CONCURRENT_TABS = 5      # Simultaneous browser tabs
