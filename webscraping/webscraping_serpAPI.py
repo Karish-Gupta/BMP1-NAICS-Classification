@@ -12,10 +12,10 @@ dotenv.load_dotenv()
 
 # --- CONFIGURATION ---
 SERPAPI_KEY = os.getenv("SERP_API_KEY")
-INPUT_FILE = "data/split_data_with_summaries/train_with_summaries.csv"
-OUTPUT_FILE = "serp_dataset_summarized_train.csv"
+INPUT_FILE = "data/split_data_with_summaries/val_with_summaries.csv"
+OUTPUT_FILE = "serp_dataset_summarized_val.csv"
 
-START_INDEX = 30000           # Only process rows starting from this index
+START_INDEX = 1           # Only process rows starting from this index
 CREDIT_LIMIT = 5000          # Total credits to use for this session
 MAX_CHARS = 6000
 BATCH_SIZE = 15              # Rows per checkpoint save
