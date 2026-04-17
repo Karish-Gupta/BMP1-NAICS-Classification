@@ -8,7 +8,7 @@ from model.multi_head_model.loss import HierarchicalLoss
 
 # Load data
 train_df = pd.read_csv("data/split_data_serp_api/train_data_with_summaries.csv", encoding="cp1252", encoding_errors="replace", engine="python") 
-test_df = pd.read_csv("data/split_data_serp_api/test_data_with_summaries.csv", encoding="cp1252", encoding_errors="replace", engine="python")
+test_df = pd.read_csv("data/split_data_serp_api/test_data_only_summaries.csv", encoding="cp1252", encoding_errors="replace", engine="python")
 val_df = pd.read_csv("data/split_data_serp_api/val_data_with_summaries.csv", encoding="cp1252", encoding_errors="replace", engine="python")
 
 # Initialize Datasets
